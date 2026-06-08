@@ -1,0 +1,14 @@
+[project]
+name = "apocalyptic-journey-cardpack-creator"
+version = "0.1.0"
+description = "Tkinter editor for creating pure data card-pack mods for Witch's Apocalyptic Journey."
+requires-python = ">=3.10"
+authors = [
+  { name = "AuraKaliya" }
+]
+readme = "README.md"
+
+[tool.ruff]
+line-length = 120
+target-version = "py310"
+
