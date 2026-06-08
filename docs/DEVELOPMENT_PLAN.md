@@ -46,10 +46,12 @@ Initial supported steps:
 - `Damage`
 - `ChangeDefence`
 - `ChangePower`
+- `DrawCount`
 - `AddBuff`
 - `RemoveBuff`
 
 The editor exposes these options in Chinese, while retaining the internal Lua API names for export.
+The script output is checked against the official `ModTemplate/Scripts/ScriptSample.lua`: mod scripts use `self:` calls, and original game IDs may use `DataId.xxx`.
 
 Supported card trigger fields:
 

@@ -38,6 +38,10 @@ def main() -> None:
     assert len(steps) == 3
     assert not unsupported
     assert steps_to_lua(steps) == 'self:SetStatus("Target"); self:Damage("6"); self:AddBuff("buff_x", "1");'
+    data_id_steps, unsupported = lua_to_steps('self:AddBuff(DataId.buff_bleeding, "10"); self:DrawCount("2");')
+    assert len(data_id_steps) == 2
+    assert not unsupported
+    assert steps_to_lua(data_id_steps) == 'self:AddBuff(DataId.buff_bleeding, "10"); self:DrawCount("2");'
     chinese_step = EffectStep(
         kind=STEP_KIND_BY_LABEL["造成伤害"],
         target=TARGET_BY_LABEL["选中敌人"],

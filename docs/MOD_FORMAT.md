@@ -68,3 +68,27 @@ self.Vars:set_Item("BaseScript", "CommonCardItem");
 
 Use `AttackCardItem` for target-selecting attack cards and `CommonCardItem` for self-targeting skill or power cards.
 
+## Lua Script Notes
+
+The official `apocalyptic-journey-mod-tutorial/ModTemplate` says mod script columns are Lua and `self` is a `ScriptExecutor`.
+
+Common calls:
+
+```lua
+self:SetStatus("Self");
+self:SetStatus("Target");
+self:SetStatus("All");
+self:SetStatus("AllRandomEnemy2");
+self:Damage("6");
+self:ChangeDefence("8");
+self:ChangePower("1");
+self:DrawCount("1");
+self:AddBuff(DataId.buff_bleeding, "10");
+self:RemoveBuff(DataId.buff_bleeding);
+```
+
+Original game IDs can be referenced as `DataId.xxx`. Mod IDs should be literal strings, for example:
+
+```lua
+self:AddBuff("MyMod_cards_my_buff", "1");
+```

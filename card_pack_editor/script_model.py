@@ -3,12 +3,23 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 
-TARGETS = ["Self", "Target", "AllEnemy", "AllRandomEnemy1"]
+TARGETS = [
+    "Self",
+    "Target",
+    "All",
+    "AllFriend",
+    "AllRandomEnemy1",
+    "AllRandomEnemy2",
+    "AllRandomFriend1",
+]
 TARGET_LABELS = {
     "Self": "自己",
     "Target": "选中敌人",
-    "AllEnemy": "所有敌人",
-    "AllRandomEnemy1": "随机敌人",
+    "All": "所有对象",
+    "AllFriend": "所有友军",
+    "AllRandomEnemy1": "随机1名敌人",
+    "AllRandomEnemy2": "随机2名敌人",
+    "AllRandomFriend1": "随机1名友军",
 }
 TARGET_BY_LABEL = {label: value for value, label in TARGET_LABELS.items()}
 
@@ -17,6 +28,7 @@ STEP_KINDS = [
     "Damage",
     "ChangeDefence",
     "ChangePower",
+    "DrawCount",
     "AddBuff",
     "RemoveBuff",
 ]
@@ -25,6 +37,7 @@ STEP_KIND_LABELS = {
     "Damage": "造成伤害",
     "ChangeDefence": "获得格挡",
     "ChangePower": "改变魔能",
+    "DrawCount": "抽牌",
     "AddBuff": "添加 Buff",
     "RemoveBuff": "移除 Buff",
 }
@@ -70,6 +83,8 @@ class EffectStep:
             return f"获得格挡：{self.value}"
         if self.kind == "ChangePower":
             return f"改变魔能：{self.value}"
+        if self.kind == "DrawCount":
+            return f"抽牌：{self.value}"
         if self.kind == "AddBuff":
             return f"添加 Buff：{self.buff_id} x {self.value}"
         if self.kind == "RemoveBuff":

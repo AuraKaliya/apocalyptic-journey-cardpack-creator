@@ -8,7 +8,7 @@ from .models import Project
 from .utils import clean_id, clean_mod_name, runtime_pack_id
 
 
-ADD_BUFF_RE = re.compile(r'AddBuff\("(?P<buff>[^"]+)"')
+ADD_BUFF_RE = re.compile(r'AddBuff\(\s*(?:"(?P<quoted>[^"]+)"|(?P<expr>DataId\.[A-Za-z0-9_]+))')
 
 
 @dataclass
@@ -59,7 +59,9 @@ def validate_project(project: Project) -> list[ValidationIssue]:
 
     for card in project.cards:
         for match in ADD_BUFF_RE.finditer(card.use_script or ""):
-            buff_ref = match.group("buff")
+            buff_ref = match.group("quoted") or match.group("expr") or ""
+            if buff_ref.startswith("DataId.") or buff_ref.startswith("buff_"):
+                continue
             if buff_ref not in buff_ids and buff_ref not in runtime_buff_ids:
                 issues.append(ValidationIssue("warning", f"Card {card.card_id} references unknown buff: {buff_ref}"))
 
@@ -76,4 +78,3 @@ def validate_project(project: Project) -> list[ValidationIssue]:
 
 def has_errors(issues: list[ValidationIssue]) -> bool:
     return any(issue.severity == "error" for issue in issues)
-

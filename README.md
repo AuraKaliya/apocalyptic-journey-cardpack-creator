@@ -48,7 +48,7 @@ CardPackEditor/
 - 导入已有 Mod 文件夹，例如 `MoonRite`。
 - 保存/打开编辑器项目 JSON，便于中途继续编辑。
 - 预览卡包封面、当前卡牌、当前 Buff、导出结构和运行时 ID。
-- 使用可视化步骤生成常见 `UseScript`，并可从简单 Lua 反解析回步骤。
+- 使用可视化步骤生成常见 `DrawScript` / `UseScript` / `DropScript`，并可从简单 Lua 反解析回步骤。
 - 导出前校验 ID、资源、脚本和常见 Buff 引用问题。
 - PNG/GIF 可直接显示；其他图片格式会保留路径并在导出时复制。
 - 导出实际 Mod 文件夹，包含：
@@ -114,10 +114,18 @@ python -m py_compile @files
 - 造成伤害：`Damage`
 - 获得格挡：`ChangeDefence`
 - 改变魔能：`ChangePower`
+- 抽牌：`DrawCount`
 - 添加 Buff：`AddBuff`
 - 移除 Buff：`RemoveBuff`
 
 “生成到当前脚本”会用当前步骤替换所选触发状态对应的源码框。“从当前脚本解析”只支持这些简单调用；复杂 Lua 会继续保留在源码编辑模式中。
+
+脚本写法已按官方 `apocalyptic-journey-mod-tutorial/ModTemplate` 对照：
+
+- Mod 卡牌脚本使用 Lua 的 `self:` 调用，例如 `self:SetStatus("Target"); self:Damage("6");`
+- `BaseScript` 使用 `self.Vars:set_Item("BaseScript", "AttackCardItem");` 或 `CommonCardItem`
+- 原版 ID 可写 `DataId.buff_bleeding`，生成器不会给 `DataId.xxx` 加引号
+- Mod 自定义 ID 使用字符串字面量，例如 `"MyMod_cards_my_buff"`
 
 ## 使用建议
 

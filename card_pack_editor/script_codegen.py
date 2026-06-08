@@ -21,10 +21,12 @@ def steps_to_lua(steps: list[EffectStep]) -> str:
             lines.append(f'self:ChangeDefence("{step.value or "0"}");')
         elif step.kind == "ChangePower":
             lines.append(f'self:ChangePower("{step.value or "0"}");')
+        elif step.kind == "DrawCount":
+            lines.append(f'self:DrawCount("{step.value or "0"}");')
         elif step.kind == "AddBuff":
-            lines.append(f'self:AddBuff("{step.buff_id}", "{step.value or "1"}");')
+            lines.append(f"self:AddBuff({_lua_id_arg(step.buff_id)}, \"{step.value or '1'}\");")
         elif step.kind == "RemoveBuff":
-            lines.append(f'self:RemoveBuff("{step.buff_id}");')
+            lines.append(f"self:RemoveBuff({_lua_id_arg(step.buff_id)});")
     return " ".join(lines)
 
 
@@ -42,6 +44,8 @@ def lua_to_steps(lua: str) -> tuple[list[EffectStep], list[str]]:
             steps.append(EffectStep("ChangeDefence", value=args[0]))
         elif name == "ChangePower" and args:
             steps.append(EffectStep("ChangePower", value=args[0]))
+        elif name == "DrawCount" and args:
+            steps.append(EffectStep("DrawCount", value=args[0]))
         elif name == "AddBuff" and len(args) >= 2:
             steps.append(EffectStep("AddBuff", buff_id=args[0], value=args[1]))
         elif name == "RemoveBuff" and args:
@@ -59,3 +63,9 @@ def _parse_args(args: str) -> list[str]:
         return []
     return [item.strip().strip('"').strip("'") for item in row]
 
+
+def _lua_id_arg(value: str) -> str:
+    value = (value or "").strip()
+    if value.startswith("DataId."):
+        return value
+    return f'"{value}"'
