@@ -102,16 +102,22 @@ python -m py_compile @files
 
 ## 可视化脚本编辑
 
-卡牌页的“可视化 UseScript 编辑”支持第一批常用步骤：
+卡牌页的“可视化脚本编辑”支持按触发状态编辑：
 
-- `SetStatus`
-- `Damage`
-- `ChangeDefence`
-- `ChangePower`
-- `AddBuff`
-- `RemoveBuff`
+- 抽到时：写入 `DrawScript`
+- 使用时：写入 `UseScript`
+- 弃置时：写入 `DropScript`
 
-“生成 UseScript”会用当前步骤替换源码框里的 `UseScript`。“从 UseScript 解析”只支持这些简单调用；复杂 Lua 会继续保留在源码编辑模式中。
+界面选项使用中文展示，导出时仍生成游戏需要的 Lua API。当前支持第一批常用步骤：
+
+- 设置目标：`SetStatus`
+- 造成伤害：`Damage`
+- 获得格挡：`ChangeDefence`
+- 改变魔能：`ChangePower`
+- 添加 Buff：`AddBuff`
+- 移除 Buff：`RemoveBuff`
+
+“生成到当前脚本”会用当前步骤替换所选触发状态对应的源码框。“从当前脚本解析”只支持这些简单调用；复杂 Lua 会继续保留在源码编辑模式中。
 
 ## 使用建议
 

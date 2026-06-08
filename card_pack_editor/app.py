@@ -8,7 +8,15 @@ from .constants import APP_TITLE
 from .mod_io import export_mod_folder, import_mod_folder, load_project, save_project
 from .models import Buff, Card, Project
 from .script_codegen import lua_to_steps, steps_to_lua
-from .script_model import STEP_KINDS, TARGETS, EffectStep
+from .script_model import (
+    SCRIPT_FIELD_BY_LABEL,
+    SCRIPT_FIELD_LABELS,
+    STEP_KIND_BY_LABEL,
+    STEP_KIND_LABELS,
+    TARGET_BY_LABEL,
+    TARGET_LABELS,
+    EffectStep,
+)
 from .utils import clean_id, clean_mod_name, runtime_pack_id
 from .validation import has_errors, validate_project
 
@@ -170,46 +178,64 @@ class CardPackEditor(tk.Tk):
             ("description_en", "英文描述", 3),
             ("description_ja", "日文描述", 3),
             ("init_script", "InitScript", 3),
-            ("draw_script", "DrawScript", 3),
-            ("use_script", "UseScript", 5),
-            ("drop_script", "DropScript", 3),
+            ("draw_script", "抽到时 DrawScript", 3),
+            ("use_script", "使用时 UseScript", 5),
+            ("drop_script", "弃置时 DropScript", 3),
         ]:
             self.card_texts[key] = self._text_field(text_frame, label, height)
 
     def _build_script_builder(self, parent: ttk.Frame, row: int) -> None:
-        frame = ttk.LabelFrame(parent, text="可视化 UseScript 编辑")
+        frame = ttk.LabelFrame(parent, text="可视化脚本编辑")
         frame.grid(row=row, column=0, columnspan=3, sticky=tk.EW, pady=(8, 4))
         frame.columnconfigure(1, weight=1)
 
-        self.script_vars["kind"] = tk.StringVar(value="SetStatus")
-        self.script_vars["target"] = tk.StringVar(value="Self")
+        self.script_vars["field"] = tk.StringVar(value=SCRIPT_FIELD_LABELS["use_script"])
+        self.script_vars["kind"] = tk.StringVar(value=STEP_KIND_LABELS["SetStatus"])
+        self.script_vars["target"] = tk.StringVar(value=TARGET_LABELS["Self"])
         self.script_vars["value"] = tk.StringVar(value="1")
         self.script_vars["buff_id"] = tk.StringVar(value="")
 
-        ttk.Label(frame, text="动作").grid(row=0, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Combobox(frame, textvariable=self.script_vars["kind"], values=STEP_KINDS, state="readonly", width=18).grid(
-            row=0, column=1, sticky=tk.W, pady=3
+        ttk.Label(frame, text="触发状态").grid(row=0, column=0, sticky=tk.W, padx=4, pady=3)
+        trigger_combo = ttk.Combobox(
+            frame,
+            textvariable=self.script_vars["field"],
+            values=list(SCRIPT_FIELD_BY_LABEL),
+            state="readonly",
+            width=18,
         )
-        ttk.Label(frame, text="目标").grid(row=0, column=2, sticky=tk.W, padx=4, pady=3)
-        ttk.Combobox(frame, textvariable=self.script_vars["target"], values=TARGETS, width=18).grid(
+        trigger_combo.grid(row=0, column=1, sticky=tk.W, pady=3)
+        trigger_combo.bind("<<ComboboxSelected>>", lambda _event: self.parse_current_script_to_steps())
+
+        ttk.Label(frame, text="动作").grid(row=0, column=2, sticky=tk.W, padx=4, pady=3)
+        ttk.Combobox(
+            frame,
+            textvariable=self.script_vars["kind"],
+            values=list(STEP_KIND_BY_LABEL),
+            state="readonly",
+            width=18,
+        ).grid(
             row=0, column=3, sticky=tk.W, pady=3
         )
-        ttk.Label(frame, text="数值").grid(row=1, column=0, sticky=tk.W, padx=4, pady=3)
-        ttk.Entry(frame, textvariable=self.script_vars["value"], width=20).grid(row=1, column=1, sticky=tk.W, pady=3)
-        ttk.Label(frame, text="Buff Id").grid(row=1, column=2, sticky=tk.W, padx=4, pady=3)
-        ttk.Entry(frame, textvariable=self.script_vars["buff_id"], width=28).grid(row=1, column=3, sticky=tk.W, pady=3)
+        ttk.Label(frame, text="目标").grid(row=1, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Combobox(frame, textvariable=self.script_vars["target"], values=list(TARGET_BY_LABEL), width=18).grid(
+            row=1, column=1, sticky=tk.W, pady=3
+        )
+        ttk.Label(frame, text="数值").grid(row=1, column=2, sticky=tk.W, padx=4, pady=3)
+        ttk.Entry(frame, textvariable=self.script_vars["value"], width=20).grid(row=1, column=3, sticky=tk.W, pady=3)
+        ttk.Label(frame, text="Buff Id").grid(row=2, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Entry(frame, textvariable=self.script_vars["buff_id"], width=34).grid(row=2, column=1, columnspan=3, sticky=tk.W, pady=3)
 
         self.script_step_list = tk.Listbox(frame, height=5)
-        self.script_step_list.grid(row=2, column=0, columnspan=4, sticky=tk.EW, padx=4, pady=(4, 2))
-        self.script_status = ttk.Label(frame, text="可从简单 Lua 解析，也可由步骤生成 Lua。")
-        self.script_status.grid(row=3, column=0, columnspan=4, sticky=tk.W, padx=4)
+        self.script_step_list.grid(row=3, column=0, columnspan=4, sticky=tk.EW, padx=4, pady=(4, 2))
+        self.script_status = ttk.Label(frame, text="选择触发状态后，可从对应脚本解析，也可由步骤生成脚本。")
+        self.script_status.grid(row=4, column=0, columnspan=4, sticky=tk.W, padx=4)
 
         buttons = ttk.Frame(frame)
-        buttons.grid(row=4, column=0, columnspan=4, sticky=tk.EW, pady=(4, 2))
+        buttons.grid(row=5, column=0, columnspan=4, sticky=tk.EW, pady=(4, 2))
         ttk.Button(buttons, text="添加步骤", command=self.add_visual_step).pack(side=tk.LEFT)
         ttk.Button(buttons, text="删除选中", command=self.delete_visual_step).pack(side=tk.LEFT, padx=4)
-        ttk.Button(buttons, text="从 UseScript 解析", command=self.parse_use_script_to_steps).pack(side=tk.LEFT, padx=4)
-        ttk.Button(buttons, text="生成 UseScript", command=self.write_steps_to_use_script).pack(side=tk.LEFT, padx=4)
+        ttk.Button(buttons, text="从当前脚本解析", command=self.parse_current_script_to_steps).pack(side=tk.LEFT, padx=4)
+        ttk.Button(buttons, text="生成到当前脚本", command=self.write_steps_to_current_script).pack(side=tk.LEFT, padx=4)
         ttk.Button(buttons, text="清空步骤", command=self.clear_visual_steps).pack(side=tk.LEFT, padx=4)
 
     def _build_buff_tab(self) -> None:
@@ -392,7 +418,8 @@ class CardPackEditor(tk.Tk):
             var.set(str(getattr(card, key, "")))
         for key, widget in self.card_texts.items():
             self.set_text(widget, getattr(card, key, ""))
-        self.visual_steps, unsupported = lua_to_steps(card.use_script)
+        script_field = self.current_script_field()
+        self.visual_steps, unsupported = lua_to_steps(getattr(card, script_field))
         if hasattr(self, "script_step_list"):
             self.refresh_visual_steps()
             if unsupported:
@@ -454,8 +481,8 @@ class CardPackEditor(tk.Tk):
 
     def add_visual_step(self) -> None:
         step = EffectStep(
-            kind=self.script_vars["kind"].get(),
-            target=self.script_vars["target"].get(),
+            kind=STEP_KIND_BY_LABEL.get(self.script_vars["kind"].get(), self.script_vars["kind"].get()),
+            target=TARGET_BY_LABEL.get(self.script_vars["target"].get(), self.script_vars["target"].get()),
             value=self.script_vars["value"].get().strip(),
             buff_id=self.script_vars["buff_id"].get().strip(),
         )
@@ -473,17 +500,30 @@ class CardPackEditor(tk.Tk):
         self.visual_steps = []
         self.refresh_visual_steps()
 
-    def parse_use_script_to_steps(self) -> None:
-        steps, unsupported = lua_to_steps(self.get_text(self.card_texts["use_script"]))
+    def current_script_field(self) -> str:
+        label = self.script_vars.get("field", tk.StringVar(value=SCRIPT_FIELD_LABELS["use_script"])).get()
+        return SCRIPT_FIELD_BY_LABEL.get(label, "use_script")
+
+    def current_script_label(self) -> str:
+        field = self.current_script_field()
+        return SCRIPT_FIELD_LABELS.get(field, "使用时")
+
+    def parse_current_script_to_steps(self) -> None:
+        field = self.current_script_field()
+        steps, unsupported = lua_to_steps(self.get_text(self.card_texts[field]))
         self.visual_steps = steps
         self.refresh_visual_steps()
         if unsupported:
-            self.script_status.configure(text=f"识别 {len(steps)} 步；有 {len(unsupported)} 段自定义 Lua 未转换，会保留在源码中。")
+            self.script_status.configure(
+                text=f"{self.current_script_label()}：识别 {len(steps)} 步；有 {len(unsupported)} 段自定义 Lua 未转换。"
+            )
         else:
-            self.script_status.configure(text=f"识别 {len(steps)} 步。")
+            self.script_status.configure(text=f"{self.current_script_label()}：识别 {len(steps)} 步。")
 
-    def write_steps_to_use_script(self) -> None:
-        self.set_text(self.card_texts["use_script"], steps_to_lua(self.visual_steps))
+    def write_steps_to_current_script(self) -> None:
+        field = self.current_script_field()
+        self.set_text(self.card_texts[field], steps_to_lua(self.visual_steps))
+        self.script_status.configure(text=f"已生成到 {self.current_script_label()} 脚本。")
         self.update_preview()
 
     def refresh_visual_steps(self) -> None:
@@ -628,8 +668,14 @@ class CardPackEditor(tk.Tk):
                 "InitScript:",
                 init_script,
                 "",
+                "抽到时 DrawScript:",
+                card.draw_script or "(空)",
+                "",
                 "UseScript:",
                 card.use_script or "(空)",
+                "",
+                "弃置时 DropScript:",
+                card.drop_script or "(空)",
             ])
 
         if buff:

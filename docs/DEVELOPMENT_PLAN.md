@@ -49,6 +49,14 @@ Initial supported steps:
 - `AddBuff`
 - `RemoveBuff`
 
+The editor exposes these options in Chinese, while retaining the internal Lua API names for export.
+
+Supported card trigger fields:
+
+- 抽到时 -> `DrawScript`
+- 使用时 -> `UseScript`
+- 弃置时 -> `DropScript`
+
 Conversion rules:
 
 - Visual steps -> Lua must be reliable.
@@ -93,4 +101,3 @@ The immediate target is Phase 1 plus the first slice of Phase 2:
 - validation report in preview and before export
 - visual card `UseScript` builder for common effect chains
 - best-effort parser for existing simple `UseScript`
-

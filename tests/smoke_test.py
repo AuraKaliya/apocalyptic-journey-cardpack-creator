@@ -11,6 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from card_pack_editor.mod_io import export_mod_folder, import_mod_folder
 from card_pack_editor.script_codegen import lua_to_steps, steps_to_lua
+from card_pack_editor.script_model import STEP_KIND_BY_LABEL, TARGET_BY_LABEL, EffectStep
 from card_pack_editor.validation import has_errors, validate_project
 
 
@@ -37,6 +38,14 @@ def main() -> None:
     assert len(steps) == 3
     assert not unsupported
     assert steps_to_lua(steps) == 'self:SetStatus("Target"); self:Damage("6"); self:AddBuff("buff_x", "1");'
+    chinese_step = EffectStep(
+        kind=STEP_KIND_BY_LABEL["造成伤害"],
+        target=TARGET_BY_LABEL["选中敌人"],
+        value="9",
+    )
+    assert steps_to_lua([EffectStep("SetStatus", target=chinese_step.target), chinese_step]) == (
+        'self:SetStatus("Target"); self:Damage("9");'
+    )
 
     project.mod_name = "MoonRiteImportedTest"
     export_parent = Path(tempfile.mkdtemp(prefix="cardpack_editor_smoke_"))
