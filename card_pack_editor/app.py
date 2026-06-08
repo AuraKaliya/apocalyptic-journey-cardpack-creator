@@ -7,7 +7,10 @@ from tkinter import filedialog, messagebox, ttk
 from .constants import APP_TITLE
 from .mod_io import export_mod_folder, import_mod_folder, load_project, save_project
 from .models import Buff, Card, Project
+from .script_codegen import lua_to_steps, steps_to_lua
+from .script_model import STEP_KINDS, TARGETS, EffectStep
 from .utils import clean_id, clean_mod_name, runtime_pack_id
+from .validation import has_errors, validate_project
 
 
 class CardPackEditor(tk.Tk):
@@ -25,6 +28,8 @@ class CardPackEditor(tk.Tk):
         self.project_vars: dict[str, tk.StringVar] = {}
         self.card_texts: dict[str, tk.Text] = {}
         self.buff_texts: dict[str, tk.Text] = {}
+        self.script_vars: dict[str, tk.StringVar] = {}
+        self.visual_steps: list[EffectStep] = []
         self._preview_image: tk.PhotoImage | None = None
         self._loading = False
 
@@ -65,6 +70,7 @@ class CardPackEditor(tk.Tk):
         self.notebook.add(self.project_tab, text="卡包 / Mod")
         self.notebook.add(self.card_tab, text="卡牌")
         self.notebook.add(self.buff_tab, text="Buff / 状态")
+        self.notebook.bind("<<NotebookTabChanged>>", lambda _event: self.update_preview())
 
         self._build_project_tab()
         self._build_card_tab()
@@ -154,8 +160,10 @@ class CardPackEditor(tk.Tk):
         ttk.Button(quick, text="攻击牌", command=lambda: self.set_card_base("AttackCardItem")).pack(side=tk.LEFT)
         ttk.Button(quick, text="技能/能力牌", command=lambda: self.set_card_base("CommonCardItem")).pack(side=tk.LEFT, padx=6)
 
+        self._build_script_builder(form, len(fields) + 2)
+
         text_frame = ttk.Frame(form)
-        text_frame.grid(row=len(fields) + 2, column=0, columnspan=3, sticky=tk.EW)
+        text_frame.grid(row=len(fields) + 3, column=0, columnspan=3, sticky=tk.EW)
         for key, label, height in [
             ("description", "中文描述", 4),
             ("description_hant", "繁中描述", 3),
@@ -167,6 +175,42 @@ class CardPackEditor(tk.Tk):
             ("drop_script", "DropScript", 3),
         ]:
             self.card_texts[key] = self._text_field(text_frame, label, height)
+
+    def _build_script_builder(self, parent: ttk.Frame, row: int) -> None:
+        frame = ttk.LabelFrame(parent, text="可视化 UseScript 编辑")
+        frame.grid(row=row, column=0, columnspan=3, sticky=tk.EW, pady=(8, 4))
+        frame.columnconfigure(1, weight=1)
+
+        self.script_vars["kind"] = tk.StringVar(value="SetStatus")
+        self.script_vars["target"] = tk.StringVar(value="Self")
+        self.script_vars["value"] = tk.StringVar(value="1")
+        self.script_vars["buff_id"] = tk.StringVar(value="")
+
+        ttk.Label(frame, text="动作").grid(row=0, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Combobox(frame, textvariable=self.script_vars["kind"], values=STEP_KINDS, state="readonly", width=18).grid(
+            row=0, column=1, sticky=tk.W, pady=3
+        )
+        ttk.Label(frame, text="目标").grid(row=0, column=2, sticky=tk.W, padx=4, pady=3)
+        ttk.Combobox(frame, textvariable=self.script_vars["target"], values=TARGETS, width=18).grid(
+            row=0, column=3, sticky=tk.W, pady=3
+        )
+        ttk.Label(frame, text="数值").grid(row=1, column=0, sticky=tk.W, padx=4, pady=3)
+        ttk.Entry(frame, textvariable=self.script_vars["value"], width=20).grid(row=1, column=1, sticky=tk.W, pady=3)
+        ttk.Label(frame, text="Buff Id").grid(row=1, column=2, sticky=tk.W, padx=4, pady=3)
+        ttk.Entry(frame, textvariable=self.script_vars["buff_id"], width=28).grid(row=1, column=3, sticky=tk.W, pady=3)
+
+        self.script_step_list = tk.Listbox(frame, height=5)
+        self.script_step_list.grid(row=2, column=0, columnspan=4, sticky=tk.EW, padx=4, pady=(4, 2))
+        self.script_status = ttk.Label(frame, text="可从简单 Lua 解析，也可由步骤生成 Lua。")
+        self.script_status.grid(row=3, column=0, columnspan=4, sticky=tk.W, padx=4)
+
+        buttons = ttk.Frame(frame)
+        buttons.grid(row=4, column=0, columnspan=4, sticky=tk.EW, pady=(4, 2))
+        ttk.Button(buttons, text="添加步骤", command=self.add_visual_step).pack(side=tk.LEFT)
+        ttk.Button(buttons, text="删除选中", command=self.delete_visual_step).pack(side=tk.LEFT, padx=4)
+        ttk.Button(buttons, text="从 UseScript 解析", command=self.parse_use_script_to_steps).pack(side=tk.LEFT, padx=4)
+        ttk.Button(buttons, text="生成 UseScript", command=self.write_steps_to_use_script).pack(side=tk.LEFT, padx=4)
+        ttk.Button(buttons, text="清空步骤", command=self.clear_visual_steps).pack(side=tk.LEFT, padx=4)
 
     def _build_buff_tab(self) -> None:
         pane = ttk.PanedWindow(self.buff_tab, orient=tk.HORIZONTAL)
@@ -348,6 +392,11 @@ class CardPackEditor(tk.Tk):
             var.set(str(getattr(card, key, "")))
         for key, widget in self.card_texts.items():
             self.set_text(widget, getattr(card, key, ""))
+        self.visual_steps, unsupported = lua_to_steps(card.use_script)
+        if hasattr(self, "script_step_list"):
+            self.refresh_visual_steps()
+            if unsupported:
+                self.script_status.configure(text=f"当前脚本可识别 {len(self.visual_steps)} 步；另有 {len(unsupported)} 段自定义 Lua。")
         self.card_list.selection_clear(0, tk.END)
         self.card_list.selection_set(index)
         self._loading = False
@@ -402,6 +451,47 @@ class CardPackEditor(tk.Tk):
             self.set_text(self.card_texts["use_script"], 'self:SetStatus("Target"); self:Damage("6");')
         elif base_script == "CommonCardItem" and not self.get_text(self.card_texts["use_script"]):
             self.set_text(self.card_texts["use_script"], 'self:SetStatus("Self"); self:ChangeDefence("5");')
+
+    def add_visual_step(self) -> None:
+        step = EffectStep(
+            kind=self.script_vars["kind"].get(),
+            target=self.script_vars["target"].get(),
+            value=self.script_vars["value"].get().strip(),
+            buff_id=self.script_vars["buff_id"].get().strip(),
+        )
+        self.visual_steps.append(step)
+        self.refresh_visual_steps()
+
+    def delete_visual_step(self) -> None:
+        selection = self.script_step_list.curselection()
+        if not selection:
+            return
+        del self.visual_steps[selection[0]]
+        self.refresh_visual_steps()
+
+    def clear_visual_steps(self) -> None:
+        self.visual_steps = []
+        self.refresh_visual_steps()
+
+    def parse_use_script_to_steps(self) -> None:
+        steps, unsupported = lua_to_steps(self.get_text(self.card_texts["use_script"]))
+        self.visual_steps = steps
+        self.refresh_visual_steps()
+        if unsupported:
+            self.script_status.configure(text=f"识别 {len(steps)} 步；有 {len(unsupported)} 段自定义 Lua 未转换，会保留在源码中。")
+        else:
+            self.script_status.configure(text=f"识别 {len(steps)} 步。")
+
+    def write_steps_to_use_script(self) -> None:
+        self.set_text(self.card_texts["use_script"], steps_to_lua(self.visual_steps))
+        self.update_preview()
+
+    def refresh_visual_steps(self) -> None:
+        self.script_step_list.delete(0, tk.END)
+        for index, step in enumerate(self.visual_steps, start=1):
+            self.script_step_list.insert(tk.END, f"{index}. {step.label()}")
+        if not self.visual_steps:
+            self.script_status.configure(text="尚未添加可视化步骤。")
 
     def on_buff_selected(self, _event: tk.Event) -> None:
         selection = self.buff_list.curselection()
@@ -474,37 +564,63 @@ class CardPackEditor(tk.Tk):
             setattr(card, key, self.get_text(widget))
         return card
 
+    def selected_buff_snapshot(self) -> Buff | None:
+        if self.current_buff_index is None or not self.project.buffs:
+            return None
+        buff = Buff(**self.project.buffs[self.current_buff_index].__dict__)
+        for key, var in self.buff_vars.items():
+            setattr(buff, key, var.get().strip())
+        for key, widget in self.buff_texts.items():
+            setattr(buff, key, self.get_text(widget))
+        return buff
+
+    def preview_project_snapshot(self) -> Project:
+        project = Project.from_dict(self.project.to_dict())
+        for key, var in self.project_vars.items():
+            setattr(project, key, var.get().strip())
+        project.mod_description = self.get_text(self.project_text_mod_description)
+        project.pack_description = self.get_text(self.project_text_pack_description)
+        project.pack_description_en = self.get_text(self.project_text_pack_description_en)
+        card = self.selected_card_snapshot()
+        if card is not None and self.current_card_index is not None:
+            project.cards[self.current_card_index] = card
+        buff = self.selected_buff_snapshot()
+        if buff is not None and self.current_buff_index is not None:
+            project.buffs[self.current_buff_index] = buff
+        return project
+
     def update_preview(self) -> None:
         if self._loading or not hasattr(self, "preview_text"):
             return
-        mod_name = self.project_vars.get("mod_name", tk.StringVar(value=self.project.mod_name)).get() or self.project.mod_name
-        csv_name = self.project_vars.get("csv_name", tk.StringVar(value=self.project.csv_name)).get() or self.project.csv_name
-        pack_id = self.project_vars.get("pack_id", tk.StringVar(value=self.project.pack_id)).get() or self.project.pack_id
-        run_pack_id = runtime_pack_id(mod_name, csv_name, pack_id)
-        pack_name = self.project_vars.get("pack_name", tk.StringVar(value=self.project.pack_name)).get() or self.project.pack_name
+        project = self.preview_project_snapshot()
+        run_pack_id = runtime_pack_id(project.mod_name, project.csv_name, project.pack_id)
+        card = self.selected_card_snapshot()
+        buff = self.selected_buff_snapshot()
+        issues = validate_project(project)
 
         lines = [
-            f"Mod: {mod_name}",
-            f"CSV: {csv_name}.csv",
+            "卡包预览",
+            "=" * 32,
+            f"Mod: {project.mod_name}",
+            f"CSV: {project.csv_name}.csv",
             f"运行时卡包 Id: {run_pack_id}",
-            f"卡包: {pack_name}",
-            self.get_text(self.project_text_pack_description) if hasattr(self, "project_text_pack_description") else "",
+            f"卡包: {project.pack_name}",
+            f"类型: {project.pack_type}",
+            project.pack_description,
             "",
             f"卡牌数量: {len(self.project.cards)}",
             f"Buff 数量: {len(self.project.buffs)}",
         ]
 
-        image_path = self.project_vars.get("pack_icon_source", tk.StringVar(value="")).get()
-        card = self.selected_card_snapshot()
         if card:
-            image_path = card.icon_source or image_path
             init_script = card.init_script or f'self.Vars:set_Item("BaseScript", "{card.base_script or "CommonCardItem"}");'
             lines.extend([
                 "",
-                "当前卡牌",
-                "-" * 28,
+                "当前卡牌预览",
+                "=" * 32,
                 f"[{card.card_type}] {card.name}",
                 f"Id: {card.card_id}",
+                f"运行时 Id: {project.mod_name}_{project.csv_name}_{card.card_id}",
                 f"费用: {card.expend}    稀有度: {card.rarity}    标签: {card.tag or '-'}",
                 "",
                 card.description,
@@ -516,10 +632,66 @@ class CardPackEditor(tk.Tk):
                 card.use_script or "(空)",
             ])
 
+        if buff:
+            lines.extend([
+                "",
+                "当前 Buff 预览",
+                "=" * 32,
+                f"{buff.name} ({buff.buff_id})",
+                f"运行时 Id: {project.mod_name}_{project.csv_name}_{buff.buff_id}",
+                f"类型: {buff.buff_type}    稀有度: {buff.rarity}    上限: {buff.upper_bound}",
+                f"减少: 回合 {buff.reduce_per_turn} / 受击 {buff.reduce_per_attacked} / 行动 {buff.reduce_per_use}",
+                f"图标: {buff.icon or '-'}",
+                "",
+                buff.description,
+                "",
+                "ApplyScript:",
+                buff.apply_script or "(空)",
+            ])
+
+        lines.extend([
+            "",
+            "导出结构预览",
+            "=" * 32,
+            f"{project.mod_name}/",
+            "  ModConfig.json",
+            "  Icon.png",
+            f"  Data/CardPack/{project.csv_name}.csv",
+            f"  Text/CardPack/{project.csv_name}.csv",
+            f"  Data/Card/{project.csv_name}.csv",
+            f"  Text/Card/{project.csv_name}.csv",
+        ])
+        if project.buffs:
+            lines.extend([
+                f"  Data/Buff/{project.csv_name}.csv",
+                f"  Text/Buff/{project.csv_name}.csv",
+            ])
+        lines.extend([
+            "  ModResource/Images/CardPack/",
+            f"  ModResource/Images/Card/{project.mod_name}/",
+            "",
+            "校验报告",
+            "=" * 32,
+        ])
+        if issues:
+            lines.extend(issue.label() for issue in issues)
+        else:
+            lines.append("未发现错误或警告。")
+
         self.preview_text.configure(state=tk.NORMAL)
         self.preview_text.delete("1.0", tk.END)
         self.preview_text.insert("1.0", "\n".join(lines))
         self.preview_text.configure(state=tk.DISABLED)
+
+        image_path = project.pack_icon_source
+        try:
+            tab_text = self.notebook.tab(self.notebook.select(), "text")
+        except tk.TclError:
+            tab_text = ""
+        if "卡牌" in tab_text and card and card.icon_source:
+            image_path = card.icon_source
+        elif "Buff" in tab_text and buff and Path(buff.icon).is_file():
+            image_path = buff.icon
         self.load_preview_image(image_path)
 
     def load_preview_image(self, image_path: str) -> None:
@@ -552,6 +724,14 @@ class CardPackEditor(tk.Tk):
 
     def export_mod(self) -> None:
         self.save_project_from_ui()
+        issues = validate_project(self.project)
+        if has_errors(issues):
+            messagebox.showerror("无法导出", "\n".join(issue.label() for issue in issues))
+            return
+        if issues:
+            message = "\n".join(issue.label() for issue in issues)
+            if not messagebox.askyesno("发现警告", f"{message}\n\n仍然继续导出吗？"):
+                return
         folder = filedialog.askdirectory(title="选择导出父目录")
         if not folder:
             return

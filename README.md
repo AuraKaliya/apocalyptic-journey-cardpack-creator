@@ -47,7 +47,10 @@ CardPackEditor/
 - 创建可选 Buff/状态：脚本、层数规则、文本和表现字段。
 - 导入已有 Mod 文件夹，例如 `MoonRite`。
 - 保存/打开编辑器项目 JSON，便于中途继续编辑。
-- 预览当前卡牌文本和图片；PNG/GIF 可直接显示，JPG 会保留路径并在导出时复制。
+- 预览卡包封面、当前卡牌、当前 Buff、导出结构和运行时 ID。
+- 使用可视化步骤生成常见 `UseScript`，并可从简单 Lua 反解析回步骤。
+- 导出前校验 ID、资源、脚本和常见 Buff 引用问题。
+- PNG/GIF 可直接显示；其他图片格式会保留路径并在导出时复制。
 - 导出实际 Mod 文件夹，包含：
   - `ModConfig.json`
   - `Data/CardPack/*.csv`
@@ -94,6 +97,21 @@ python -m py_compile @files
 ```
 
 核心格式说明见 [docs/MOD_FORMAT.md](docs/MOD_FORMAT.md)。
+
+后续开发方案见 [docs/DEVELOPMENT_PLAN.md](docs/DEVELOPMENT_PLAN.md)。
+
+## 可视化脚本编辑
+
+卡牌页的“可视化 UseScript 编辑”支持第一批常用步骤：
+
+- `SetStatus`
+- `Damage`
+- `ChangeDefence`
+- `ChangePower`
+- `AddBuff`
+- `RemoveBuff`
+
+“生成 UseScript”会用当前步骤替换源码框里的 `UseScript`。“从 UseScript 解析”只支持这些简单调用；复杂 Lua 会继续保留在源码编辑模式中。
 
 ## 使用建议
 
